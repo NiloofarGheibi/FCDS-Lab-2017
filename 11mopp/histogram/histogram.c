@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <omp.h>
 
 #define RGB_COMPONENT_COLOR 255
 
@@ -87,19 +88,26 @@ void Histogram(PPMImage *image, float *h) {
 	cols = image->x;
 	rows = image->y;
 
-	for (i = 0; i < n; i++) {
+	int n_threads = __builtin_omp_get_num_threads();
+
+#pragma omp parallel for num_threads(n_threads) schedule(static,1)
+	for (i = 0; i< (int)n; i++) 
+	{
 		image->data[i].red = floor((image->data[i].red * 4) / 256);
 		image->data[i].blue = floor((image->data[i].blue * 4) / 256);
 		image->data[i].green = floor((image->data[i].green * 4) / 256);
+		//printf("i %d = red %d blue %d green %d\n",i, image->data[i].red, image->data[i].blue,image->data[i].green);
 	}
 
 	count = 0;
 	x = 0;
 	for (j = 0; j <= 3; j++) {
 		for (k = 0; k <= 3; k++) {
-			for (l = 0; l <= 3; l++) {
-				for (i = 0; i < n; i++) {
+			for (l = 0; l <= 3; l++) {		
+#pragma omp parallel for num_threads(n_threads)
+				for (i = 0; i < (int)n; i++) {
 					if (image->data[i].red == j && image->data[i].green == k && image->data[i].blue == l) {
+					#pragma omp critical
 						count++;
 					}
 				}
@@ -110,6 +118,8 @@ void Histogram(PPMImage *image, float *h) {
 		}
 	}
 }
+
+
 
 int main(int argc, char *argv[]) {
 

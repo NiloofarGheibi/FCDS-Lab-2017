@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <limits.h>
+#include <omp.h>
 
 #define INT_TYPE unsigned long long 
 #define INT_TYPE_SIZE (sizeof(INT_TYPE) * 8)
@@ -62,6 +63,7 @@ static inline int cell_v_count(cell_v *v) {
 static inline int digit_get (cell_v *v) {
     int count = cell_v_count(v);
     if (count != 1) return -1;
+//#pragma omp parallel for schedule(dynamic,50)
     for (int i = 0; i < CELL_VAL_SIZE; i++) 
         if ((*v).v[i]) return 1 + INT_TYPE_SIZE * i + __builtin_ctzll((*v).v[i]);
     return -1;
@@ -96,6 +98,7 @@ static void init(sudoku *s) {
     int i, j, k, l, pos;
     
     //unit list 
+#pragma omp parallel for schedule(dynamic,100)
     for (i = 0; i < s->dim; i++) {
         int ibase = i / s->bdim * s->bdim;
         for (j = 0; j < s->dim; j++) {
@@ -115,6 +118,7 @@ static void init(sudoku *s) {
     }
     
     //peers
+#pragma omp parallel for schedule(dynamic,100)
     for (i = 0; i < s->dim; i++)
         for (j = 0; j < s->dim; j++) {
             pos = 0;
@@ -135,18 +139,23 @@ static void init(sudoku *s) {
 }
 
 static int parse_grid(sudoku *s) {
-    int i, j, k;
+    int i, j, k=0;
     int ld_vals[s->dim][s->dim];
-    for (k = 0, i = 0; i < s->dim; i++)
+
+#pragma omp parallel for schedule(dynamic,100) 
+    for (i = 0; i < s->dim; i++)
         for (j = 0; j < s->dim; j++, k++) {
             ld_vals[i][j] = s->grid[k];
         }
     
+
+#pragma omp parallel for schedule(dynamic,100)   
     for (i = 0; i < s->dim; i++)
         for (j = 0; j < s->dim; j++)
             for (k = 1; k <= s->dim; k++)
                 cell_v_set(&s->values[i][j], k);
-    
+
+  
     for (i = 0; i < s->dim; i++)
         for (j = 0; j < s->dim; j++)
             if (ld_vals[i][j] > 0 && !assign(s, i, j, ld_vals[i][j]))

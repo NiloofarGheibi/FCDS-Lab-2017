@@ -178,6 +178,7 @@ static sudoku *create_sudoku(int bdim, int *grid) {
     //[r][c][0 - row, 1 - column, 2 - box]//[r][c][0 - row, 1 - column, 2 - box][ix]
     r->unit_list = malloc(sizeof(cell_coord***) * dim);
     assert(r->unit_list);
+#pragma omp parallel for schedule(dynamic,100) 
     for (int i = 0; i < dim; i++) {
         r->unit_list[i] = malloc(sizeof(cell_coord**) * dim);
         assert (r->unit_list[i]);
@@ -193,6 +194,7 @@ static sudoku *create_sudoku(int bdim, int *grid) {
     
     r->peers = malloc(sizeof(cell_coord**) * dim);
     assert(r->peers);
+#pragma omp parallel for schedule(dynamic,100) 
     for (int i = 0; i < dim; i++) {
         r->peers[i] = malloc(sizeof(cell_coord*) * dim);
         assert(r->peers[i]);
@@ -204,6 +206,7 @@ static sudoku *create_sudoku(int bdim, int *grid) {
     
     r->values = malloc (sizeof(cell_v*) * dim);
     assert(r->values);
+#pragma omp parallel for schedule(dynamic,100) 
     for (int i = 0; i < dim; i++) {
         r->values[i] = calloc(dim, sizeof(cell_v));
         assert(r->values[i]);
@@ -235,6 +238,7 @@ static int eliminate (sudoku *s, int i, int j, int d) {
             if (!eliminate(s, s->peers[i][j][k].r, s->peers[i][j][k].c, digit_get(&s->values[i][j])))
                 return 0;
     }
+
 
     for (k = 0; k < 3; k++) {//row, column, box 
         cont = 0;

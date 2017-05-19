@@ -90,7 +90,7 @@ void Histogram(PPMImage *image, float *h) {
 
 	int n_threads = __builtin_omp_get_num_threads();
 
-#pragma omp parallel for num_threads(n_threads) schedule(static,1)
+#pragma omp parallel for num_threads(n_threads) schedule(dynamic,120)
 	for (i = 0; i< (int)n; i++) 
 	{
 		image->data[i].red = floor((image->data[i].red * 4) / 256);

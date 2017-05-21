@@ -142,14 +142,16 @@ static int parse_grid(sudoku *s) {
     int i, j, k=0;
     int ld_vals[s->dim][s->dim];
 
-#pragma omp parallel for schedule(dynamic,100) 
-    for (i = 0; i < s->dim; i++)
-        for (j = 0; j < s->dim; j++, k++) {
+#pragma omp parallel for schedule(dynamic) 
+    for (i = 0; i < s->dim; i++){
+        for (j = 0; j < s->dim; k++,j++) {
             ld_vals[i][j] = s->grid[k];
         }
+    }
     
 
-#pragma omp parallel for schedule(dynamic,100)   
+//#pragma omp parallel for schedule(dynamic,100) 
+#pragma omp parallel for collapse(3)
     for (i = 0; i < s->dim; i++)
         for (j = 0; j < s->dim; j++)
             for (k = 1; k <= s->dim; k++)

@@ -14,6 +14,7 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <omp.h>
 typedef unsigned char cell_t; 
 
 cell_t ** allocate_board (int size) {
@@ -40,18 +41,24 @@ int adjacent_to (cell_t ** board, int size, int i, int j) {
 	int ek = (i+1 < size) ? i+1 : i;
 	int sl = (j>0) ? j-1 : j;
         int el = (j+1 < size) ? j+1 : j;
-
+#pragma omp parallel
+{
+#pragma omp parallel for collapse(2) 
 	for (k=sk; k<=ek; k++)
 		for (l=sl; l<=el; l++)
 			count+=board[k][l];
+}
 	count-=board[i][j];
 	
 	return count;
 }
 
 void play (cell_t ** board, cell_t ** newboard, int size) {
+#pragma omp parallel
+{
 	int	i, j, a;
 	/* for each cell, apply the rules of Life */
+#pragma omp parallel for collapse(2) 
 	for (i=0; i<size; i++)
 		for (j=0; j<size; j++) {
 			a = adjacent_to (board, size, i, j);
@@ -60,6 +67,8 @@ void play (cell_t ** board, cell_t ** newboard, int size) {
 			if (a < 2) newboard[i][j] = 0;
 			if (a > 3) newboard[i][j] = 0;
 		}
+}
+	
 }
 
 /* print the life board */

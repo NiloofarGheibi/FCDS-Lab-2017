@@ -107,7 +107,7 @@ void Histogram(PPMImage *image, float *h) {
 #pragma omp parallel for num_threads(n_threads)
 				for (i = 0; i < (int)n; i++) {
 					if (image->data[i].red == j && image->data[i].green == k && image->data[i].blue == l) {
-					#pragma omp critical
+					#pragma omp atomic
 						count++;
 					}
 				}

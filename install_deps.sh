@@ -9,4 +9,10 @@
 apt-get update
 # for (simple) c and c++ there is a single metapackage that is
 # needed:
-apt-get install -y build-essential
+apt-get install -y build-essential 
+apt-get install -y software-properties-common
+
+apt-get update
+add-apt-repository -y ppa:longsleep/golang-backports
+apt-get update 
+apt-get install -y golang-go

@@ -137,14 +137,14 @@ func SpaceMap(str string) string {
 	}, str)
 }
 
-func Read(fin string) []byte {
+// func Read(fin string) []byte {
 
-	pwd, _ := os.Getwd()
-	file, err := ioutil.ReadFile(pwd + "/" + fin) // pass the file name
-	must(err)
+// 	pwd, _ := os.Getwd()
+// 	file, err := ioutil.ReadFile(pwd + "/" + fin) // pass the file name
+// 	must(err)
 
-	return file
-}
+// 	return file
+// }
 
 func Get(file []byte) (int, int, [][]int) {
 
@@ -192,8 +192,11 @@ func init() {
 }
 func main() {
 
-	file := Read(*fin)
+	//file := Read(*fin)
 	//fmt.Println(file)
+	file, err := ioutil.ReadAll(os.Stdin)
+	must(err)
+	//fmt.Println(err, string(bytes))
 	size, steps, prev := Get(file)
 	//next := allocate_board(size)
 	var tmp, next [][]int

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -191,6 +192,7 @@ func Count(board [][]int, size int) [][]int {
 		for i := 0; i < size; i++ {
 			c[j][i] = adjacent_to(board, size, j, i)
 		}
+		//fmt.Println("count = ", c[j])
 	}
 	return c
 }
@@ -203,7 +205,8 @@ func worker(tasksCh <-chan message, wg *sync.WaitGroup, size int, next chan resu
 		if !ok {
 			return
 		}
-		//mt.Println("processing task", task)
+		//fmt.Println("processing task", task.row_id, "= ", task.row)
+		//fmt.Println(task.row_id, " ", "count", task.count)
 		// ____________ Processing ____________
 		for j := 0; j < size; j++ {
 
@@ -252,10 +255,12 @@ func main() {
 	var tmp, n [][]int
 	for i := 0; i < steps; i++ {
 		var wg sync.WaitGroup
+		runtime.GOMAXPROCS(runtime.NumCPU())
+		workers := runtime.NumCPU()
 		next := make(chan result, size)
 		c := Count(prev, size)
-		wg.Add(size)
-		go pool(&wg, size, size, prev, c, next)
+		wg.Add(workers)
+		go pool(&wg, workers, size, prev, c, next)
 		wg.Wait()
 		close(next)
 		// Data for each row is ready

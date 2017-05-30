@@ -1,17 +1,3 @@
-/*
- * The Game of Life
- *
- * a cell is born, if it has exactly three neighbours
- * a cell dies of loneliness, if it has less than two neighbours
- * a cell dies of overcrowding, if it has more than three neighbours
- * a cell survives to the next generation, if it does not die of loneliness
- * or overcrowding
- *
- * In this version, a 2D array of ints is used.  A 1 cell is on, a 0 cell is off.
- * The game plays a number of steps (given by the input), printing to the screen each time.  'x' printed
- * means on, space means off.
- *
- */
 package main
 
 import (
@@ -22,10 +8,22 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 )
 
 var fin *string
+
+type message struct {
+	count  []int
+	row    []int
+	row_id int
+}
+
+type result struct {
+	row    []int
+	row_id int
+}
 
 func must(err error) {
 	if err != nil {
@@ -84,25 +82,30 @@ func adjacent_to(board [][]int, size int, i int, j int) int {
 	return count
 }
 
-func play(board [][]int, size int) [][]int {
-	var a int
+func play(board [][]int, size int, a [][]int) [][]int {
+	//var a int
 	newboard := allocate_board(size)
 	/* for each cell, apply the rules of Life */
 	for i := 0; i < size; i++ {
 		for j := 0; j < size; j++ {
-			a = adjacent_to(board, size, i, j)
-			if a == 2 {
-				newboard[i][j] = board[i][j]
-			}
 
-			if a == 3 {
-				newboard[i][j] = 1
-			}
-			if a < 2 {
-				newboard[i][j] = 0
-			}
-			if a > 3 {
-				newboard[i][j] = 0
+			if board[i][j] == 0 && a[i][j] == 0 {
+				continue
+			} else {
+
+				if a[i][j] == 2 {
+					newboard[i][j] = board[i][j]
+				}
+
+				if a[i][j] == 3 {
+					newboard[i][j] = 1
+				}
+				if a[i][j] < 2 {
+					newboard[i][j] = 0
+				}
+				if a[i][j] > 3 {
+					newboard[i][j] = 0
+				}
 			}
 		}
 	}
@@ -136,15 +139,6 @@ func SpaceMap(str string) string {
 		return r
 	}, str)
 }
-
-// func Read(fin string) []byte {
-
-// 	pwd, _ := os.Getwd()
-// 	file, err := ioutil.ReadFile(pwd + "/" + fin) // pass the file name
-// 	must(err)
-
-// 	return file
-// }
 
 func Get(file []byte) (int, int, [][]int) {
 
@@ -190,25 +184,93 @@ func init() {
 	flag.Parse()
 
 }
-func main() {
+func Count(board [][]int, size int) [][]int {
+	c := allocate_board(size)
+	// updating the count
+	for j := 0; j < size; j++ {
+		for i := 0; i < size; i++ {
+			c[j][i] = adjacent_to(board, size, j, i)
+		}
+	}
+	return c
+}
 
-	//file := Read(*fin)
-	//fmt.Println(file)
-	file, err := ioutil.ReadAll(os.Stdin)
-	must(err)
-	//fmt.Println(err, string(bytes))
-	size, steps, prev := Get(file)
-	//next := allocate_board(size)
-	var tmp, next [][]int
-	for i := 0; i < steps; i++ {
-		next = play(prev, size)
-		//fmt.Printf("%v ----------\n", i)
-		//print(next, size)
-		tmp = next
-		next = prev
-		prev = tmp
+func worker(tasksCh <-chan message, wg *sync.WaitGroup, size int, next chan result) {
+	defer wg.Done()
+	for {
+		newboard := make([]int, size)
+		task, ok := <-tasksCh
+		if !ok {
+			return
+		}
+		//mt.Println("processing task", task)
+		// ____________ Processing ____________
+		for j := 0; j < size; j++ {
+
+			if task.row[j] == 0 && task.count[j] == 0 {
+				continue
+			} else {
+				if task.count[j] == 2 {
+					newboard[j] = task.row[j]
+				}
+
+				if task.count[j] == 3 {
+					newboard[j] = 1
+				}
+				if task.count[j] < 2 {
+					newboard[j] = 0
+				}
+				if task.count[j] > 3 {
+					newboard[j] = 0
+				}
+			}
+		}
+		//_______________ END ________________
+		next <- result{newboard, task.row_id}
+	}
+}
+
+func pool(wg *sync.WaitGroup, workers, tasks int, board [][]int, a [][]int, next chan result) {
+	tasksCh := make(chan message)
+
+	for i := 0; i < workers; i++ {
+		go worker(tasksCh, wg, tasks, next)
 	}
 
-	//fmt.Printf("LAST \n")
+	for i := 0; i < tasks; i++ {
+		tasksCh <- message{a[i], board[i], i}
+	}
+
+	close(tasksCh)
+
+}
+
+func main() {
+	file, err := ioutil.ReadAll(os.Stdin)
+	must(err)
+	size, steps, prev := Get(file)
+	var tmp, n [][]int
+	for i := 0; i < steps; i++ {
+		var wg sync.WaitGroup
+		next := make(chan result, size)
+		c := Count(prev, size)
+		wg.Add(size)
+		go pool(&wg, size, size, prev, c, next)
+		wg.Wait()
+		close(next)
+		// Data for each row is ready
+		//fmt.Println("After WAIT")
+		n = allocate_board(size)
+		for i := range next {
+			//fmt.Println("Row = ", i.row, "id = ", i.row_id)
+			n[i.row_id] = i.row
+		}
+
+		//print(n, size)
+		tmp = n
+		n = prev
+		prev = tmp
+	}
 	print(prev, size)
+
 }

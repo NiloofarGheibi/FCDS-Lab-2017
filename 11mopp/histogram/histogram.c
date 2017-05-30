@@ -89,9 +89,9 @@ void Histogram(PPMImage *image, float *h) {
 	rows = image->y;
 
 	int n_threads = omp_get_num_procs();//__builtin_omp_get_num_threads();
-	printf("#threads%d\n",n_threads );
+	//printf("#threads%d\n",n_threads );
 	int chunk = n/n_threads;
-	printf("#Chunk%d\n",chunk );
+	//printf("#Chunk%d\n",chunk );
 #pragma omp parallel for schedule(static, chunk) //num_threads(n_threads)
 	for (i = 0; i< (int)n; i++) 
 	{

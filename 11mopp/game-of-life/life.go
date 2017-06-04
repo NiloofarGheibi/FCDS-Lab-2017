@@ -147,9 +147,9 @@ func Get(file []byte) (int, int, [][]int) {
 	split := strings.SplitAfter(str, "\n")
 
 	// string to parse
-	//log.Println("first line : ", split[0])
+	//log.Println("1 line : ", split[0])
 	ints := strings.SplitAfter(split[0], " ")
-	//log.Println("first line : ", ints[0], ints[1])
+	//log.Println("first line data: ", ints[0], ints[1])
 	size, err := strconv.Atoi(SpaceMap(ints[0]))
 	must(err)
 	steps, err := strconv.Atoi(SpaceMap(strings.SplitAfter(ints[1], "\n")[0]))
@@ -160,15 +160,16 @@ func Get(file []byte) (int, int, [][]int) {
 	}
 	//log.Println("size: , steps: ", size, steps)
 	board := allocate_board(size)
-	for j := 1; j < size; j++ {
+	for j := 1; j <= size; j++ {
 		/* get a string */
 		/* copy the string to the life board */
+		//fmt.Println("j = ", j, "=> ", split[j])
 		for i := 0; i < size; i++ {
 			if byte(split[j][i]) == 'x' {
-				board[i][j] = 1
+				board[i][j-1] = 1
 				//log.Println("x")
 			} else {
-				board[i][j] = 0
+				board[i][j-1] = 0
 				//log.Println("_")
 			}
 

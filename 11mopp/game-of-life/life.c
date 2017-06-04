@@ -106,7 +106,8 @@ int main () {
 	int size, steps;
 	FILE    *f;
   f = stdin;
-	fscanf(f,"%d %d", &size, &steps);
+	fscanf(f,"%d %d", &size, &steps);  
+    while (fgetc(f) != '\n');   
 	cell_t ** prev = allocate_board (size);
 	read_file (f, prev,size);
 	fclose(f);

@@ -42,7 +42,11 @@ int adjacent_to (cell_t ** board, int size, int i, int j) {
 	int sl = (j>0) ? j-1 : j;
         int el = (j+1 < size) ? j+1 : j;
 
-#pragma omp parallel for collapse(2) 
+int n_threads = omp_get_num_procs(); //__builtin_omp_get_num_threads();
+	//printf("#threads%d\n",n_threads );
+int chunk = size/n_threads;
+	//printf("#Chunk%d\n",chunk );
+#pragma omp parallel for schedule(static, chunk) //num_threads(n_threads)
 	for (k=sk; k<=ek; k++)
 		for (l=sl; l<=el; l++)
 			count+=board[k][l];
@@ -53,12 +57,16 @@ int adjacent_to (cell_t ** board, int size, int i, int j) {
 }
 
 void play (cell_t ** board, cell_t ** newboard, int size) {
-#pragma omp parallel
-{
+int n_threads = omp_get_num_procs(); //__builtin_omp_get_num_threads();
+	//printf("#threads%d\n",n_threads );
+int chunk = size/n_threads;
+	//printf("#Chunk%d\n",chunk );
+
 	int	i, j, a;
 	/* for each cell, apply the rules of Life */
+#pragma parallel for collapse(2)
 	for (i=0; i<size; i++)
-#pragma omp parallel for schedule(dynamic,100)
+#pragma omp parallel for schedule(static, chunk) //num_threads(n_threads)
 		for (j=0; j<size; j++) {
 			a = adjacent_to (board, size, i, j);
 			if (a == 2) newboard[i][j] = board[i][j];
@@ -68,7 +76,7 @@ void play (cell_t ** board, cell_t ** newboard, int size) {
 		}
 }
 	
-}
+
 
 /* print the life board */
 void print (cell_t ** board, int size) {
@@ -103,10 +111,15 @@ void read_file (FILE * f, cell_t ** board, int size) {
 }
 
 int main () {
+	int n_threads = omp_get_num_procs(); //__builtin_omp_get_num_threads();
+	printf("#threads%d\n",n_threads );
+    
 	int size, steps;
 	FILE    *f;
   f = stdin;
-	fscanf(f,"%d %d", &size, &steps);  
+	fscanf(f,"%d %d", &size, &steps); 
+	int chunk = size/n_threads;
+	printf("#Chunk%d\n",chunk ); 
     while (fgetc(f) != '\n');   
 	cell_t ** prev = allocate_board (size);
 	read_file (f, prev,size);

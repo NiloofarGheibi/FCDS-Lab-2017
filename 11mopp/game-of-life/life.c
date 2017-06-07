@@ -46,6 +46,8 @@ int n_threads = omp_get_num_procs(); //__builtin_omp_get_num_threads();
 	//printf("#threads%d\n",n_threads );
 int chunk = size/n_threads;
 	//printf("#Chunk%d\n",chunk );
+
+
 #pragma omp parallel for schedule(static, chunk) //num_threads(n_threads)
 	for (k=sk; k<=ek; k++)
 		for (l=sl; l<=el; l++)
@@ -64,11 +66,37 @@ int chunk = size/n_threads;
 
 	int	i, j, a;
 	/* for each cell, apply the rules of Life */
+	// TODO colapse hazf beshe 
+	// Dynamic 
 #pragma parallel for collapse(2)
 	for (i=0; i<size; i++)
-#pragma omp parallel for schedule(static, chunk) //num_threads(n_threads)
+#pragma omp parallel for schedule(dynamic, chunk) //num_threads(n_threads)
 		for (j=0; j<size; j++) {
-			a = adjacent_to (board, size, i, j);
+			//a = adjacent_to (board, size, i, j);
+//
+int	k, l, a=0;
+	
+	int sk = (i>0) ? i-1 : i;
+	int ek = (i+1 < size) ? i+1 : i;
+	int sl = (j>0) ? j-1 : j;
+        int el = (j+1 < size) ? j+1 : j;
+
+int n_threads = omp_get_num_procs(); //__builtin_omp_get_num_threads();
+	//printf("#threads%d\n",n_threads );
+int chunk = size/n_threads;
+	//printf("#Chunk%d\n",chunk );
+
+
+#pragma omp parallel for schedule(dynamic, chunk) //num_threads(n_threads)
+	for (k=sk; k<=ek; k++)
+		for (l=sl; l<=el; l++)
+			a+=board[k][l];
+
+	a-=board[i][j];
+
+//
+
+
 			if (a == 2) newboard[i][j] = board[i][j];
 			if (a == 3) newboard[i][j] = 1;
 			if (a < 2) newboard[i][j] = 0;

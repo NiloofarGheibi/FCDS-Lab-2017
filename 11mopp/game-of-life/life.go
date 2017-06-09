@@ -39,50 +39,6 @@ func allocate_board(size int) [][]int {
 	return board
 }
 
-/* return the number of on cells adjacent to the i,j cell */
-func adjacent_to(board [][]int, size int, i int, j int) int {
-	var sk, ek, sl, el int
-	k := 0
-	l := 0
-	count := 0
-
-	if i > 0 {
-		sk = i - 1
-	} else {
-		sk = i
-	}
-
-	if i+1 < size {
-		ek = i + 1
-	} else {
-		ek = i
-	}
-
-	if j > 0 {
-		sl = j - 1
-	} else {
-		sl = j
-	}
-
-	if j+1 < size {
-		el = j + 1
-	} else {
-		el = j
-	}
-
-	for k = sk; k <= ek; k++ {
-
-		for l = sl; l <= el; l++ {
-			count += board[k][l]
-			//fmt.Printf(" value of count %v \n", count)
-		}
-	}
-
-	count = count - board[i][j]
-
-	return count
-}
-
 func play(board [][]int, size int, a [][]int) [][]int {
 	//var a int
 	newboard := allocate_board(size)
@@ -188,12 +144,49 @@ func init() {
 }
 func Count(board [][]int, size int) [][]int {
 	c := allocate_board(size)
+	var sk, ek, sl, el int
 	// updating the count
 	for j := 0; j < size; j++ {
 		for i := 0; i < size; i++ {
-			c[j][i] = adjacent_to(board, size, j, i)
+
+			k := 0
+			l := 0
+			count := 0
+
+			if i > 0 {
+				sk = i - 1
+			} else {
+				sk = i
+			}
+
+			if i+1 < size {
+				ek = i + 1
+			} else {
+				ek = i
+			}
+
+			if j > 0 {
+				sl = j - 1
+			} else {
+				sl = j
+			}
+
+			if j+1 < size {
+				el = j + 1
+			} else {
+				el = j
+			}
+
+			for k = sk; k <= ek; k++ {
+
+				for l = sl; l <= el; l++ {
+					count += board[k][l]
+					//fmt.Printf(" value of count %v \n", count)
+				}
+			}
+
+			c[j][i] = count - board[i][j]
 		}
-		//fmt.Println("count = ", c[j])
 	}
 	return c
 }
@@ -253,7 +246,7 @@ func main() {
 	file, err := ioutil.ReadAll(os.Stdin)
 	must(err)
 	size, steps, prev := Get(file)
-	var tmp, n [][]int
+	var n [][]int
 	for i := 0; i < steps; i++ {
 		var wg sync.WaitGroup
 		runtime.GOMAXPROCS(runtime.NumCPU())
@@ -273,9 +266,7 @@ func main() {
 		}
 
 		//print(n, size)
-		tmp = n
-		n = prev
-		prev = tmp
+		prev = n
 	}
 	print(prev, size)
 

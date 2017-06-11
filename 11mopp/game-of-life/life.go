@@ -5,12 +5,20 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"unicode"
 )
 
 var fin *string
+
+type result struct {
+	board []uint8
+	start int
+	end   int
+}
 
 func must(err error) {
 	if err != nil {
@@ -25,204 +33,38 @@ func allocate_board(size int) []uint8 {
 	return board
 }
 
-func _Cell_Turn_On(board *[]uint8, row int, col int, size int) {
-	var xoleft, xoright, yoabove, yobelow int
-
-	// OFFSET CALCULATING
-
-	if row == 0 {
-		xoleft = size - 1
-	} else {
-		xoleft = -1
-	}
-
-	if col == 0 {
-		yoabove = size * (size - 1)
-	} else {
-		yoabove = -size
-	}
-
-	if row == size-1 {
-		xoright = -(size - 1)
-	} else {
-		xoright = 1
-	}
-	if col == size-1 {
-		yobelow = -size * (size - 1)
-	} else {
-		yobelow = size
-	}
-	place := col*size + row
-	(*board)[place] |= 0x01 // first bit = state
-
-	(*board)[place+yoabove+xoleft] += 2
-	(*board)[place+yoabove] += 2
-	(*board)[place+yoabove+xoright] += 2
-	(*board)[place+xoleft] += 2
-	(*board)[place+xoright] += 2
-	(*board)[place+yobelow+xoleft] += 2
-	(*board)[place+yobelow] += 2
-	(*board)[place+yobelow+xoright] += 2
-
-}
-
-func _Cell_Turn_Off(board *[]uint8, row int, col int, size int) {
-	var xoleft, xoright, yoabove, yobelow int
-
-	// OFFSET CALCULATING
-
-	if row == 0 {
-		xoleft = size - 1
-	} else {
-		xoleft = -1
-	}
-
-	if col == 0 {
-		yoabove = size * (size - 1)
-	} else {
-		yoabove = -size
-	}
-
-	if row == size-1 {
-		xoright = -(size - 1)
-	} else {
-		xoright = 1
-	}
-	if col == size-1 {
-		yobelow = -size * (size - 1)
-	} else {
-		yobelow = size
-	}
-
-	place := col*size + row
-
-	(*board)[place] &= 0xFE // first bit = state
-
-	(*board)[place+yoabove+xoleft] -= 2
-	(*board)[place+yoabove] -= 2
-	(*board)[place+yoabove+xoright] -= 2
-	(*board)[place+xoleft] -= 2
-	(*board)[place+xoright] -= 2
-	(*board)[place+yobelow+xoleft] -= 2
-	(*board)[place+yobelow] -= 2
-	(*board)[place+yobelow+xoright] -= 2
-}
-
-func Next_Generation(board []uint8, size int) []uint8 {
-
-	for y := 0; y < size; y++ {
-		x := 0
-		//fmt.Println("before do place = ", place)
-		for x < size {
-
-			// Off and no neighbors
-			for board[(y*size)+x] == 0 {
-				fmt.Println("pass")
-				x++
-				if x >= size {
-					goto RowDone
-				}
-
-			}
-			// 0 0 0 0   0 0 0 0
-			a := (board[(y*size)+x] >> 1) & 0x17 // Number of neighbors
-			fmt.Println("Neigbours = ", a, "Value = ", board[(y*size)+x]&0x01)
-
-			if board[(y*size)+x]&0x01 == 1 {
-				if a != 2 && a != 3 {
-					_Cell_Turn_Off(&board, y, x, size)
-				}
-
-			} else {
-				if a == 3 {
-					_Cell_Turn_On(&board, y, x, size)
-				}
-			}
-			x++
-		}
-	RowDone:
-	}
-	return board
-}
-
-func play(board []uint8, size int) []uint8 {
+func _play(board []uint8, start int, end int, size int, rowsize int, split int) []uint8 {
 	//var a int
-	newboard := allocate_board(size)
+	newboard := make([]uint8, size)
 	/* for each cell, apply the rules of Life */
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
+	//fmt.Println("play => - board", board, start, end, "size = ", size)
+	//fmt.Println("play => - newboard", newboard)
 
-			// if board[(y*size)+x] == 0 {
-			// 	continue
-			// } else {
-
-			for board[(y*size)+x] == 0 {
+	for y := 0; y < split; y++ {
+		for x := 0; x < rowsize; x++ {
+			for board[(y*rowsize)+x] == 0 {
 				x++
-				if x >= size {
+				if x >= rowsize {
 					goto RowDone
 				}
 			}
-			a := (board[(y*size)+x] >> 1) & 0x17 // Number of neighbors
+			a := (board[(y*rowsize)+x] >> 1) & 0x17 // Number of neighbors
+
 			if a == 2 {
-				newboard[(y*size)+x] = board[(y*size)+x] & 0x01
+				newboard[(y*rowsize)+x] = board[(y*rowsize)+x] & 0x01
 			}
 
 			if a == 3 {
-				newboard[(y*size)+x] = 1
-
+				newboard[(y*rowsize)+x] = 1
 			}
 			if a < 2 {
-				newboard[(y*size)+x] = 0
+				newboard[(y*rowsize)+x] = 0
 			}
 			if a > 3 {
-				newboard[(y*size)+x] = 0
+				newboard[(y*rowsize)+x] = 0
 			}
-
 		}
 	RowDone:
-	}
-
-	// Counting the neighbors
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
-			count := uint8(0)
-			var xoleft, xoright, yoabove, yobelow int
-			if y == 0 {
-				xoleft = size - 1
-			} else {
-				xoleft = -1
-			}
-
-			if x == 0 {
-				yoabove = size * (size - 1)
-			} else {
-				yoabove = -size
-			}
-
-			if y == size-1 {
-				xoright = -(size - 1)
-			} else {
-				xoright = 1
-			}
-			if x == size-1 {
-				yobelow = -size * (size - 1)
-			} else {
-				yobelow = size
-			}
-			place := x*size + y
-
-			count += newboard[place+yoabove+xoleft] & 0x01
-			count += newboard[place+yoabove] & 0x01
-			count += newboard[place+yoabove+xoright] & 0x01
-			count += newboard[place+xoleft] & 0x01
-			count += newboard[place+xoright] & 0x01
-			count += newboard[place+yobelow+xoleft] & 0x01
-			count += newboard[place+yobelow] & 0x01
-			count += newboard[place+yobelow+xoright] & 0x01
-
-			newboard[place] |= count << 1
-
-		}
 	}
 
 	return newboard
@@ -325,6 +167,96 @@ func Get(file []byte) (int, int, []uint8) {
 	return size, steps, board
 }
 
+func sqr(ch chan result, board []uint8, size int, rowsize int, split int, start int, end int, wg *sync.WaitGroup) {
+	//fmt.Println("sqr => board - ", board, start, end, "size = ", size)
+	newboard := _play(board, start, end, size, rowsize, split)
+	ch <- result{newboard, start, end}
+	wg.Done()
+}
+
+func parallel(board []uint8, size int) []uint8 {
+	var wg sync.WaitGroup
+
+	numOfGoRoutines := runtime.NumCPU()
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	//fmt.Println("Go", numOfGoRoutines)
+	var tasksCh chan result
+	if size%numOfGoRoutines == 0 {
+		tasksCh = make(chan result, numOfGoRoutines)
+		split := size / numOfGoRoutines
+		wg.Add(numOfGoRoutines)
+		for i := 0; i < numOfGoRoutines; i++ {
+			go sqr(tasksCh, board[i*split*size:(size+(i*size))*split], split*size, size, split, i*split*size, (size+(i*size))*split, &wg)
+		}
+
+	} else {
+		tasksCh = make(chan result, numOfGoRoutines+1)
+		split := size / numOfGoRoutines
+		wg.Add(numOfGoRoutines + 1)
+		var i int
+		for i = 0; i < numOfGoRoutines; i++ {
+			//fmt.Println("range = ", i*split*size, (size+(i*size))*split)
+			go sqr(tasksCh, board[i*split*size:(size+(i*size))*split], split*size, size, split, i*split*size, (size+(i*size))*split, &wg)
+		}
+		go sqr(tasksCh, board[i*split*size:size*size], size*size-i*split*size, size, size%numOfGoRoutines, i*split*size, size*size, &wg)
+
+	}
+
+	wg.Wait()
+	//fmt.Println("After WAIT")
+	close(tasksCh)
+	newboard := allocate_board(size)
+	for rows := range tasksCh {
+		copy(newboard[rows.start:rows.end], rows.board[:])
+	}
+	// Counting the neighbors
+	for y := 0; y < size; y++ {
+		for x := 0; x < size; x++ {
+			count := uint8(0)
+			var xoleft, xoright, yoabove, yobelow int
+			if y == 0 {
+				xoleft = size - 1
+			} else {
+				xoleft = -1
+			}
+
+			if x == 0 {
+				yoabove = size * (size - 1)
+			} else {
+				yoabove = -size
+			}
+
+			if y == size-1 {
+				xoright = -(size - 1)
+			} else {
+				xoright = 1
+			}
+			if x == size-1 {
+				yobelow = -size * (size - 1)
+			} else {
+				yobelow = size
+			}
+			place := x*size + y
+
+			count += newboard[place+yoabove+xoleft] & 0x01
+			count += newboard[place+yoabove] & 0x01
+			count += newboard[place+yoabove+xoright] & 0x01
+			count += newboard[place+xoleft] & 0x01
+			count += newboard[place+xoright] & 0x01
+			count += newboard[place+yobelow+xoleft] & 0x01
+			count += newboard[place+yobelow] & 0x01
+			count += newboard[place+yobelow+xoright] & 0x01
+
+			newboard[place] |= count << 1
+
+		}
+	}
+
+	tasksCh = nil
+	//print(newboard, size)
+	return newboard
+}
+
 func main() {
 
 	file, err := ioutil.ReadAll(os.Stdin)
@@ -333,11 +265,7 @@ func main() {
 
 	var tmp []uint8
 	for i := 0; i < steps; i++ {
-		//n := Next_Generation(prev, size)
-		n := play(prev, size)
-		//fmt.Println(i, "____________")
-		//print(n, size)
-		//print(n, size)
+		n := parallel(prev, size)
 		tmp = n
 		n = prev
 		prev = tmp

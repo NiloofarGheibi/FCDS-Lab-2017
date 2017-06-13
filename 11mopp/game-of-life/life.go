@@ -185,9 +185,11 @@ func parallel(board []uint8, size int) []uint8 {
 		tasksCh = make(chan result, numOfGoRoutines)
 		split := size / numOfGoRoutines
 		wg.Add(numOfGoRoutines)
-		for i := 0; i < numOfGoRoutines; i++ {
+		var i int
+		for i = 0; i < numOfGoRoutines-1; i++ {
 			go sqr(tasksCh, board[i*split*size:(size+(i*size))*split], split*size, size, split, i*split*size, (size+(i*size))*split, &wg)
 		}
+		go sqr(tasksCh, board[i*split*size:size*size], size*size-i*split*size, size, size%numOfGoRoutines, i*split*size, size*size, &wg)
 
 	} else {
 		tasksCh = make(chan result, numOfGoRoutines+1)

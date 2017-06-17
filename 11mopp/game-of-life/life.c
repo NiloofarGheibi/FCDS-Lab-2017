@@ -100,9 +100,8 @@ void read_file (FILE * f, cell_t ** board, int size) {
 }
 
 int main () {
-	int n_threads = omp_get_num_procs(); //__builtin_omp_get_num_threads();
-	printf("#threads%d\n",n_threads );
 	
+
 	int size, steps;
 	FILE    *f;
 	f = stdin;
@@ -119,7 +118,6 @@ int main () {
 	print(prev,size);
 	printf("----------\n");
 	#endif
-	int chunk = size/n_threads;
 	for (i=0; i<steps; i++) {
 		play (prev,next,size);
                 #ifdef DEBUG

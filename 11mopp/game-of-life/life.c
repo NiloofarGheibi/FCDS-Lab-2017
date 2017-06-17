@@ -55,8 +55,8 @@ int adjacent_to (cell_t ** board, int size, int i, int j) {
 void play (cell_t ** board, cell_t ** newboard, int size) {
 	int	i, j, a;
 	/* for each cell, apply the rules of Life */
-//#pragma omp parallel for schedule(dynamic,100)
-#pragma omp parallel for collapse(2)
+#pragma omp parallel for schedule(dynamic,100)
+//#pragma omp parallel for collapse(2)
 	for (i=0; i<size; i++)
 		for (j=0; j<size; j++) {
 			a = adjacent_to (board, size, i, j);

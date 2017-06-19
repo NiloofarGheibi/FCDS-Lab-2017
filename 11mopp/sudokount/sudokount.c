@@ -63,7 +63,7 @@ static inline int cell_v_count(cell_v *v) {
 static inline int digit_get (cell_v *v) {
     int count = cell_v_count(v);
     if (count != 1) return -1;
-//#pragma omp parallel for schedule(dynamic,50)
+
     for (int i = 0; i < CELL_VAL_SIZE; i++) 
         if ((*v).v[i]) return 1 + INT_TYPE_SIZE * i + __builtin_ctzll((*v).v[i]);
     return -1;
@@ -98,7 +98,7 @@ static void init(sudoku *s) {
     int i, j, k, l, pos;
     
     //unit list 
-#pragma omp parallel for schedule(dynamic,100)
+
     for (i = 0; i < s->dim; i++) {
         int ibase = i / s->bdim * s->bdim;
         for (j = 0; j < s->dim; j++) {
@@ -118,7 +118,7 @@ static void init(sudoku *s) {
     }
     
     //peers
-#pragma omp parallel for schedule(dynamic,100)
+
     for (i = 0; i < s->dim; i++)
         for (j = 0; j < s->dim; j++) {
             pos = 0;
@@ -142,7 +142,6 @@ static int parse_grid(sudoku *s) {
     int i, j, k=0;
     int ld_vals[s->dim][s->dim];
 
-#pragma omp parallel for schedule(dynamic,100) 
     for (i = 0; i < s->dim; i++){
         for (j = 0; j < s->dim; k++,j++) {
             ld_vals[i][j] = s->grid[k];
@@ -150,8 +149,7 @@ static int parse_grid(sudoku *s) {
     }
     
 
-//#pragma omp parallel for schedule(dynamic,100) 
-#pragma omp parallel for collapse(3)
+
     for (i = 0; i < s->dim; i++)
         for (j = 0; j < s->dim; j++)
             for (k = 1; k <= s->dim; k++)
@@ -180,7 +178,7 @@ static sudoku *create_sudoku(int bdim, int *grid) {
     //[r][c][0 - row, 1 - column, 2 - box]//[r][c][0 - row, 1 - column, 2 - box][ix]
     r->unit_list = malloc(sizeof(cell_coord***) * dim);
     assert(r->unit_list);
-#pragma omp parallel for schedule(dynamic,100) 
+
     for (int i = 0; i < dim; i++) {
         r->unit_list[i] = malloc(sizeof(cell_coord**) * dim);
         assert (r->unit_list[i]);
@@ -196,7 +194,7 @@ static sudoku *create_sudoku(int bdim, int *grid) {
     
     r->peers = malloc(sizeof(cell_coord**) * dim);
     assert(r->peers);
-#pragma omp parallel for schedule(dynamic,100) 
+ 
     for (int i = 0; i < dim; i++) {
         r->peers[i] = malloc(sizeof(cell_coord*) * dim);
         assert(r->peers[i]);
@@ -208,7 +206,7 @@ static sudoku *create_sudoku(int bdim, int *grid) {
     
     r->values = malloc (sizeof(cell_v*) * dim);
     assert(r->values);
-#pragma omp parallel for schedule(dynamic,100) 
+
     for (int i = 0; i < dim; i++) {
         r->values[i] = calloc(dim, sizeof(cell_v));
         assert(r->values[i]);
@@ -301,14 +299,15 @@ static int search (sudoku *s, int status) {
     int ret = 0;
     
     cell_v **values_bkp = malloc (sizeof (cell_v *) * s->dim);
-//int n_threads = omp_get_num_procs();
-//int chunk = s->dim/n_threads;
-//#pragma omp parallel for schedule(static, 100)
+
     for (i = 0; i < s->dim; i++)
         values_bkp[i] = malloc (sizeof (cell_v) * s->dim);
 
-//#pragma omp parallel for schedule(static, 100)    
-    for (i = 0; i < s->dim; i++) 
+int n_threads = omp_get_num_procs();
+int chunk = s->dim/n_threads*2; 
+
+    for (i = 0; i < s->dim; i++){ 
+#pragma omp parallel for schedule(dynamic, 50)  
         for (j = 0; j < s->dim; j++) {
             int used = cell_v_count(&s->values[i][j]);
             if (used > 1 && used < min) {
@@ -317,6 +316,7 @@ static int search (sudoku *s, int status) {
                 minJ = j;
             }
         }
+    }
             
     for (k = 1; k <= s->dim; k++) {
         if (cell_v_get(&s->values[minI][minJ], k))  {
@@ -329,8 +329,10 @@ static int search (sudoku *s, int status) {
                 ret = 1;
                 goto FR_RT;
             } else {
-//#pragma omp parallel for schedule(static, 100) 
+int n_threads = omp_get_num_procs();
+int chunk = s->dim/n_threads;
                 for (i = 0; i < s->dim; i++) 
+#pragma omp parallel for schedule(dynamic, 50) 
                     for (j = 0; j < s->dim; j++)
                         s->values[i][j] = values_bkp[i][j];
             }

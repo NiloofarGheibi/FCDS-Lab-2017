@@ -94,7 +94,7 @@ func (c *CYK) findVariableAssign(symbol string) string {
 		//fmt.Println(" grammarR=", targetG.RightSymbol, " symbol=", symbol)
 		if strings.Contains(targetG.RightSymbol, symbol) { //symbol == targetG.RightSymbol {
 			retSlice = fmt.Sprintf("%s%s", retSlice, targetG.LeftSymbol)
-			fmt.Println("get Left=", retSlice)
+			//fmt.Println("get Left=", retSlice)
 		}
 	}
 	return retSlice
@@ -185,12 +185,12 @@ func (c *CYK) runCYK(input string) {
 			var result string
 			for _, symbol := range totalTargets {
 
-				fmt.Println("i=", i, " j=", j, " symbol=", symbol)
+				//fmt.Println("i=", i, " j=", j, " symbol=", symbol)
 				targetSymbol := c.findVariableAssign(symbol)
 				if !(targetSymbol == "") {
 					if !strings.Contains(result, targetSymbol) {
 						result = fmt.Sprintf("%s%s", result, targetSymbol)
-						fmt.Println("result = ", result)
+						//fmt.Println("result = ", result)
 					}
 				}
 
@@ -240,7 +240,7 @@ func (c *CYK) evalCYKResult() bool {
 		return false
 	}
 
-	fmt.Println("final:", finalResult)
+	//fmt.Println("final:", finalResult)
 	if strings.Contains(finalResult, c.StartSymbol) {
 		return true
 	}
@@ -320,7 +320,7 @@ func Split(input string) (G, string) {
 	split := strings.SplitAfter(input, "\n")
 
 	// string to parse
-	log.Println(split[0])
+	//log.Println(split[0])
 	instring := SpaceMap(split[0])
 	//instring := split[0]
 
@@ -332,7 +332,7 @@ func Split(input string) (G, string) {
 	}
 	//grammar.terminals = terminals
 	//grammar.terminals[len(terminals)-1] = SpaceMap(grammar.terminals[len(terminals)-1])
-	log.Println(split[1])
+	//log.Println(split[1])
 
 	// non terminals
 	nonterminals := strings.SplitAfter(split[2], " ")
@@ -342,20 +342,20 @@ func Split(input string) (G, string) {
 	}
 	// grammar.nonterminals = nonterminals
 	// grammar.nonterminals[len(nonterminals)-1] = SpaceMap(grammar.nonterminals[len(nonterminals)-1])
-	log.Println(split[2])
+	//log.Println(split[2])
 
 	// start
 	grammar.start = SpaceMap(split[3])
-	log.Println(split[3])
+	//log.Println(split[3])
 
 	rules := make([]string, len(split)-3)
 	j := 0
 	for i := 4; i < len(split); i++ {
 		rules[j] = SpaceMap(split[i])
 		j++
-		log.Println(split[i])
+		//log.Println(split[i])
 	}
-	log.Printf("size %d \n", j)
+	//log.Printf("size %d \n", j)
 	grammar.rules = rules
 
 	return grammar, instring
@@ -453,10 +453,10 @@ func CNF(rules []Grammar, set_terminals map[string]bool, set_nonterminals map[st
 		}
 	}
 	//fmt.Println(cnf)
-	for _, r := range cnf {
-		fmt.Println(r)
-	}
-	fmt.Println("++++++++++++++")
+	// for _, r := range cnf {
+	// 	fmt.Println(r)
+	// }
+	// fmt.Println("++++++++++++++")
 
 	for _, r := range comb_rules {
 		//fmt.Println(r)
@@ -464,9 +464,9 @@ func CNF(rules []Grammar, set_terminals map[string]bool, set_nonterminals map[st
 	}
 	//fmt.Println("++++++++++++++")
 
-	for _, r := range cnf {
-		fmt.Println(r)
-	}
+	// for _, r := range cnf {
+	// 	fmt.Println(r)
+	// }
 	// fmt.Println("++++++++++++++")
 	// fmt.Println("terminals", set_Mapping_Terminals)
 	// fmt.Println("SET terminals", set_terminals)
@@ -596,9 +596,7 @@ func main() {
 	must(err)
 	grammar, input := Do(string(file))
 	rules, set_terminals, set_nonterminals, set_Mapping_Terminals := Rule_Parser(grammar)
-	// fmt.Println("terminals", set_terminals)
-	// fmt.Println("nonterminals", set_nonterminals)
-	// fmt.Println("A B C terminals", set_Mapping_Terminals)
+
 	rules = CNF(rules, set_terminals, set_nonterminals, set_Mapping_Terminals, grammar)
 	cyk := NewCYK(grammar.Start())
 	_ = input
@@ -610,8 +608,14 @@ func main() {
 	}
 	cyk.SetTerminals(grammar.Terminals())
 	cyk.SetNonTerminals(grammar.NonTerminals())
-	log.Println(input)
-	result := cyk.Eval(input)
-	log.Println("Result:", result)
-	// cyk.PrintResult()
+	//log.Println(input)
+	result := cyk.Eval("5+5")
+	if result {
+		// Call the Derivation Tree
+		fmt.Println("SUCCESS")
+	} else {
+		fmt.Println("FAILED")
+	}
+	//log.Println("Result:", result)
+	cyk.PrintResult()
 }

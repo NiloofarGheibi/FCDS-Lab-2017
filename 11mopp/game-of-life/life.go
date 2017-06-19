@@ -36,9 +36,6 @@ func allocate_board(size int) []uint8 {
 func _play(board []uint8, start int, end int, size int, rowsize int, split int) []uint8 {
 	//var a int
 	newboard := make([]uint8, size)
-	/* for each cell, apply the rules of Life */
-	//fmt.Println("play => - board", board, start, end, "size = ", size)
-	//fmt.Println("play => - newboard", newboard)
 
 	for y := 0; y < split; y++ {
 		for x := 0; x < rowsize; x++ {
@@ -111,7 +108,7 @@ func Get(file []byte) (int, int, []uint8) {
 	}
 	board := allocate_board(size)
 
-	for j := 1; j < size; j++ {
+	for j := 1; j <= size; j++ {
 		for i := 0; i < size; i++ {
 			if byte(split[j][i]) == 'x' {
 				board[(j-1)*size+i] = 1
@@ -121,45 +118,47 @@ func Get(file []byte) (int, int, []uint8) {
 		}
 	}
 
-	// Counting the neighbors
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
+	for j := 0; j < size; j++ {
+		for i := 0; i < size; i++ {
+			var sk, ek, sl, el int
+			k := 0
+			l := 0
 			count := uint8(0)
-			var xoleft, xoright, yoabove, yobelow int
-			if y == 0 {
-				xoleft = size - 1
+
+			if j > 0 {
+				sk = j - 1
 			} else {
-				xoleft = -1
+				sk = j
 			}
 
-			if x == 0 {
-				yoabove = size * (size - 1)
+			if j+1 < size {
+				ek = j + 1
 			} else {
-				yoabove = -size
+				ek = i
 			}
 
-			if y == size-1 {
-				xoright = -(size - 1)
+			if i > 0 {
+				sl = i - 1
 			} else {
-				xoright = 1
+				sl = i
 			}
-			if x == size-1 {
-				yobelow = -size * (size - 1)
+
+			if i+1 < size {
+				el = i + 1
 			} else {
-				yobelow = size
+				el = i
 			}
-			place := x*size + y
 
-			count += board[place+yoabove+xoleft] & 0x01
-			count += board[place+yoabove] & 0x01
-			count += board[place+yoabove+xoright] & 0x01
-			count += board[place+xoleft] & 0x01
-			count += board[place+xoright] & 0x01
-			count += board[place+yobelow+xoleft] & 0x01
-			count += board[place+yobelow] & 0x01
-			count += board[place+yobelow+xoright] & 0x01
+			for k = sk; k <= ek; k++ {
 
-			board[place] |= count << 1
+				for l = sl; l <= el; l++ {
+					count += board[k*size+l] & 0x01
+					//fmt.Printf(" value of count %v \n", count)
+				}
+			}
+
+			count = count - board[j*size+i]&0x01
+			board[j*size+i] |= count << 1
 
 		}
 	}
@@ -186,10 +185,11 @@ func parallel(board []uint8, size int) []uint8 {
 		split := size / numOfGoRoutines
 		wg.Add(numOfGoRoutines)
 		var i int
-		for i = 0; i < numOfGoRoutines-1; i++ {
+		for i = 0; i < numOfGoRoutines; i++ {
+			//fmt.Println("for", i, "Split = ", i*split*size, "->", (size+(i*size))*split)
 			go sqr(tasksCh, board[i*split*size:(size+(i*size))*split], split*size, size, split, i*split*size, (size+(i*size))*split, &wg)
 		}
-		go sqr(tasksCh, board[i*split*size:size*size], size*size-i*split*size, size, size%numOfGoRoutines, i*split*size, size*size, &wg)
+		//go sqr(tasksCh, board[i*split*size:size*size], size*size-i*split*size, size, size%numOfGoRoutines, i*split*size, size*size, &wg)
 
 	} else {
 		tasksCh = make(chan result, numOfGoRoutines+1)
@@ -200,6 +200,7 @@ func parallel(board []uint8, size int) []uint8 {
 			//fmt.Println("range = ", i*split*size, (size+(i*size))*split)
 			go sqr(tasksCh, board[i*split*size:(size+(i*size))*split], split*size, size, split, i*split*size, (size+(i*size))*split, &wg)
 		}
+		//fmt.Println("range = ", i*split*size, size*size)
 		go sqr(tasksCh, board[i*split*size:size*size], size*size-i*split*size, size, size%numOfGoRoutines, i*split*size, size*size, &wg)
 
 	}
@@ -211,45 +212,48 @@ func parallel(board []uint8, size int) []uint8 {
 	for rows := range tasksCh {
 		copy(newboard[rows.start:rows.end], rows.board[:])
 	}
-	// Counting the neighbors
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
+
+	for j := 0; j < size; j++ {
+		for i := 0; i < size; i++ {
+			var sk, ek, sl, el int
+			k := 0
+			l := 0
 			count := uint8(0)
-			var xoleft, xoright, yoabove, yobelow int
-			if y == 0 {
-				xoleft = size - 1
+
+			if j > 0 {
+				sk = j - 1
 			} else {
-				xoleft = -1
+				sk = j
 			}
 
-			if x == 0 {
-				yoabove = size * (size - 1)
+			if j+1 < size {
+				ek = j + 1
 			} else {
-				yoabove = -size
+				ek = i
 			}
 
-			if y == size-1 {
-				xoright = -(size - 1)
+			if i > 0 {
+				sl = i - 1
 			} else {
-				xoright = 1
+				sl = i
 			}
-			if x == size-1 {
-				yobelow = -size * (size - 1)
+
+			if i+1 < size {
+				el = i + 1
 			} else {
-				yobelow = size
+				el = i
 			}
-			place := x*size + y
 
-			count += newboard[place+yoabove+xoleft] & 0x01
-			count += newboard[place+yoabove] & 0x01
-			count += newboard[place+yoabove+xoright] & 0x01
-			count += newboard[place+xoleft] & 0x01
-			count += newboard[place+xoright] & 0x01
-			count += newboard[place+yobelow+xoleft] & 0x01
-			count += newboard[place+yobelow] & 0x01
-			count += newboard[place+yobelow+xoright] & 0x01
+			for k = sk; k <= ek; k++ {
 
-			newboard[place] |= count << 1
+				for l = sl; l <= el; l++ {
+					count += newboard[k*size+l] & 0x01
+					//fmt.Printf(" value of count %v \n", count)
+				}
+			}
+
+			count = count - newboard[j*size+i]&0x01
+			newboard[j*size+i] |= count << 1
 
 		}
 	}

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -14,10 +15,15 @@ import (
 
 var fin *string
 
+type message struct {
+	count  []int
+	row    []int
+	row_id int
+}
+
 type result struct {
-	board []uint8
-	start int
-	end   int
+	row    []int
+	row_id int
 }
 
 func must(err error) {
@@ -25,43 +31,84 @@ func must(err error) {
 		log.Print(err)
 	}
 }
-func allocate_board(size int) []uint8 {
-	board := make([]uint8, size*size)
+func allocate_board(size int) [][]int {
+	board := make([][]int, size)
 	for i := range board {
-		board[i] = 0
+		board[i] = make([]int, size)
 	}
 	return board
 }
 
-func _play(board []uint8, start int, end int, size int, rowsize int, split int) []uint8 {
-	//var a int
-	newboard := make([]uint8, size)
+/* return the number of on cells adjacent to the i,j cell */
+func adjacent_to(board [][]int, size int, i int, j int) int {
+	var sk, ek, sl, el int
+	k := 0
+	l := 0
+	count := 0
 
-	for y := 0; y < split; y++ {
-		for x := 0; x < rowsize; x++ {
-			for board[(y*rowsize)+x] == 0 {
-				x++
-				if x >= rowsize {
-					goto RowDone
+	if i > 0 {
+		sk = i - 1
+	} else {
+		sk = i
+	}
+
+	if i+1 < size {
+		ek = i + 1
+	} else {
+		ek = i
+	}
+
+	if j > 0 {
+		sl = j - 1
+	} else {
+		sl = j
+	}
+
+	if j+1 < size {
+		el = j + 1
+	} else {
+		el = j
+	}
+
+	for k = sk; k <= ek; k++ {
+
+		for l = sl; l <= el; l++ {
+			count += board[k][l]
+			//fmt.Printf(" value of count %v \n", count)
+		}
+	}
+
+	count = count - board[i][j]
+
+	return count
+}
+
+func play(board [][]int, size int, a [][]int) [][]int {
+	//var a int
+	newboard := allocate_board(size)
+	/* for each cell, apply the rules of Life */
+	for i := 0; i < size; i++ {
+		for j := 0; j < size; j++ {
+
+			if board[i][j] == 0 && a[i][j] == 0 {
+				continue
+			} else {
+
+				if a[i][j] == 2 {
+					newboard[i][j] = board[i][j]
+				}
+
+				if a[i][j] == 3 {
+					newboard[i][j] = 1
+				}
+				if a[i][j] < 2 {
+					newboard[i][j] = 0
+				}
+				if a[i][j] > 3 {
+					newboard[i][j] = 0
 				}
 			}
-			a := (board[(y*rowsize)+x] >> 1) & 0x17 // Number of neighbors
-
-			if a == 2 {
-				newboard[(y*rowsize)+x] = board[(y*rowsize)+x] & 0x01
-			}
-
-			if a == 3 {
-				newboard[(y*rowsize)+x] = 1
-			}
-			if a < 2 {
-				newboard[(y*rowsize)+x] = 0
-			}
-			if a > 3 {
-				newboard[(y*rowsize)+x] = 0
-			}
 		}
-	RowDone:
 	}
 
 	return newboard
@@ -69,12 +116,12 @@ func _play(board []uint8, start int, end int, size int, rowsize int, split int) 
 }
 
 /* print the life board */
-func print(board []uint8, size int) {
+func print(board [][]int, size int) {
 	/* for each row */
 	for j := 0; j < size; j++ {
 		/* print each column position... */
 		for i := 0; i < size; i++ {
-			if board[(j*size)+i]&0x01 == 1 {
+			if board[i][j] == 1 {
 				fmt.Printf("%c", 'x')
 			} else {
 				fmt.Printf("%c", ' ')
@@ -94,187 +141,143 @@ func SpaceMap(str string) string {
 	}, str)
 }
 
-func Get(file []byte) (int, int, []uint8) {
+func Get(file []byte) (int, int, [][]int) {
 
 	str := string(file) // convert content to a 'string'
 	split := strings.SplitAfter(str, "\n")
+
+	// string to parse
+	//log.Println("1 line : ", split[0])
 	ints := strings.SplitAfter(split[0], " ")
+	//log.Println("first line data: ", ints[0], ints[1])
 	size, err := strconv.Atoi(SpaceMap(ints[0]))
 	must(err)
 	steps, err := strconv.Atoi(SpaceMap(strings.SplitAfter(ints[1], "\n")[0]))
 	must(err)
+	//v := "10"
 	if s, err := strconv.Atoi(string(ints[0])); err == nil {
 		fmt.Printf("%T, %v\n", s, s)
 	}
+	//log.Println("size: , steps: ", size, steps)
 	board := allocate_board(size)
-
 	for j := 1; j <= size; j++ {
+		/* get a string */
+		/* copy the string to the life board */
+		//fmt.Println("j = ", j, "=> ", split[j])
 		for i := 0; i < size; i++ {
 			if byte(split[j][i]) == 'x' {
-				board[(j-1)*size+i] = 1
+				board[i][j-1] = 1
+				//log.Println("x")
 			} else {
-				board[(j-1)*size+i] = 0
+				board[i][j-1] = 0
+				//log.Println("_")
 			}
-		}
-	}
-
-	for j := 0; j < size; j++ {
-		for i := 0; i < size; i++ {
-			var sk, ek, sl, el int
-			k := 0
-			l := 0
-			count := uint8(0)
-
-			if j > 0 {
-				sk = j - 1
-			} else {
-				sk = j
-			}
-
-			if j+1 < size {
-				ek = j + 1
-			} else {
-				ek = i
-			}
-
-			if i > 0 {
-				sl = i - 1
-			} else {
-				sl = i
-			}
-
-			if i+1 < size {
-				el = i + 1
-			} else {
-				el = i
-			}
-
-			for k = sk; k <= ek; k++ {
-
-				for l = sl; l <= el; l++ {
-					count += board[k*size+l] & 0x01
-					//fmt.Printf(" value of count %v \n", count)
-				}
-			}
-
-			count = count - board[j*size+i]&0x01
-			board[j*size+i] |= count << 1
 
 		}
+		//fscanf(f,"\n");
 	}
 
 	return size, steps, board
 }
 
-func sqr(ch chan result, board []uint8, size int, rowsize int, split int, start int, end int, wg *sync.WaitGroup) {
-	//fmt.Println("sqr => board - ", board, start, end, "size = ", size)
-	newboard := _play(board, start, end, size, rowsize, split)
-	ch <- result{newboard, start, end}
-	wg.Done()
+func init() {
+
+	fin = flag.String("in", "judge.in", "input file")
+	flag.Parse()
+
 }
-
-func parallel(board []uint8, size int) []uint8 {
-	var wg sync.WaitGroup
-
-	numOfGoRoutines := runtime.NumCPU()
-	runtime.GOMAXPROCS(runtime.NumCPU())
-	//fmt.Println("Go", numOfGoRoutines)
-	var tasksCh chan result
-	if size%numOfGoRoutines == 0 {
-		tasksCh = make(chan result, numOfGoRoutines)
-		split := size / numOfGoRoutines
-		wg.Add(numOfGoRoutines)
-		var i int
-		for i = 0; i < numOfGoRoutines; i++ {
-			//fmt.Println("for", i, "Split = ", i*split*size, "->", (size+(i*size))*split)
-			go sqr(tasksCh, board[i*split*size:(size+(i*size))*split], split*size, size, split, i*split*size, (size+(i*size))*split, &wg)
-		}
-		//go sqr(tasksCh, board[i*split*size:size*size], size*size-i*split*size, size, size%numOfGoRoutines, i*split*size, size*size, &wg)
-
-	} else {
-		tasksCh = make(chan result, numOfGoRoutines+1)
-		split := size / numOfGoRoutines
-		wg.Add(numOfGoRoutines + 1)
-		var i int
-		for i = 0; i < numOfGoRoutines; i++ {
-			//fmt.Println("range = ", i*split*size, (size+(i*size))*split)
-			go sqr(tasksCh, board[i*split*size:(size+(i*size))*split], split*size, size, split, i*split*size, (size+(i*size))*split, &wg)
-		}
-		//fmt.Println("range = ", i*split*size, size*size)
-		go sqr(tasksCh, board[i*split*size:size*size], size*size-i*split*size, size, size%numOfGoRoutines, i*split*size, size*size, &wg)
-
-	}
-
-	wg.Wait()
-	//fmt.Println("After WAIT")
-	close(tasksCh)
-	newboard := allocate_board(size)
-	for rows := range tasksCh {
-		copy(newboard[rows.start:rows.end], rows.board[:])
-	}
-
+func Count(board [][]int, size int) [][]int {
+	c := allocate_board(size)
+	// updating the count
 	for j := 0; j < size; j++ {
 		for i := 0; i < size; i++ {
-			var sk, ek, sl, el int
-			k := 0
-			l := 0
-			count := uint8(0)
+			c[j][i] = adjacent_to(board, size, j, i)
+		}
+		//fmt.Println("count = ", c[j])
+	}
+	return c
+}
 
-			if j > 0 {
-				sk = j - 1
+func worker(tasksCh <-chan message, wg *sync.WaitGroup, size int, next chan result) {
+	defer wg.Done()
+	for {
+		newboard := make([]int, size)
+		task, ok := <-tasksCh
+		if !ok {
+			return
+		}
+		//fmt.Println("processing task", task.row_id, "= ", task.row)
+		//fmt.Println(task.row_id, " ", "count", task.count)
+		// ____________ Processing ____________
+		for j := 0; j < size; j++ {
+
+			if task.row[j] == 0 && task.count[j] == 0 {
+				continue
 			} else {
-				sk = j
-			}
+				if task.count[j] == 2 {
+					newboard[j] = task.row[j]
+				}
 
-			if j+1 < size {
-				ek = j + 1
-			} else {
-				ek = i
-			}
-
-			if i > 0 {
-				sl = i - 1
-			} else {
-				sl = i
-			}
-
-			if i+1 < size {
-				el = i + 1
-			} else {
-				el = i
-			}
-
-			for k = sk; k <= ek; k++ {
-
-				for l = sl; l <= el; l++ {
-					count += newboard[k*size+l] & 0x01
-					//fmt.Printf(" value of count %v \n", count)
+				if task.count[j] == 3 {
+					newboard[j] = 1
+				}
+				if task.count[j] < 2 {
+					newboard[j] = 0
+				}
+				if task.count[j] > 3 {
+					newboard[j] = 0
 				}
 			}
-
-			count = count - newboard[j*size+i]&0x01
-			newboard[j*size+i] |= count << 1
-
 		}
+		//_______________ END ________________
+		next <- result{newboard, task.row_id}
+	}
+}
+
+func pool(wg *sync.WaitGroup, workers, tasks int, board [][]int, a [][]int, next chan result) {
+	tasksCh := make(chan message)
+
+	for i := 0; i < workers; i++ {
+		go worker(tasksCh, wg, tasks, next)
 	}
 
-	tasksCh = nil
-	//print(newboard, size)
-	return newboard
+	for i := 0; i < tasks; i++ {
+		tasksCh <- message{a[i], board[i], i}
+	}
+
+	close(tasksCh)
+
 }
 
 func main() {
-
 	file, err := ioutil.ReadAll(os.Stdin)
 	must(err)
 	size, steps, prev := Get(file)
-
-	var tmp []uint8
+	Count(prev, size)
+	var tmp, n [][]int
 	for i := 0; i < steps; i++ {
-		n := parallel(prev, size)
+		var wg sync.WaitGroup
+		runtime.GOMAXPROCS(runtime.NumCPU())
+		workers := runtime.NumCPU()
+		next := make(chan result, size)
+		c := Count(prev, size)
+		wg.Add(workers)
+		go pool(&wg, workers, size, prev, c, next)
+		wg.Wait()
+		close(next)
+		// Data for each row is ready
+		//fmt.Println("After WAIT")
+		n = allocate_board(size)
+		for i := range next {
+			//fmt.Println("Row = ", i.row, "id = ", i.row_id)
+			n[i.row_id] = i.row
+		}
+
+		//print(n, size)
 		tmp = n
 		n = prev
 		prev = tmp
 	}
 	print(prev, size)
+
 }

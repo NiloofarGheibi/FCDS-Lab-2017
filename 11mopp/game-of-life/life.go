@@ -211,26 +211,35 @@ func worker(tasksCh <-chan message, wg *sync.WaitGroup, size int, next chan resu
 		// ____________ Processing ____________
 		for j := 0; j < size; j++ {
 
-			if task.row[j] == 0 && task.count[j] == 0 {
-				continue
-			} else {
-				if task.count[j] == 2 {
-					newboard[j] = task.row[j]
+			// if task.row[j] == 0 && task.count[j] == 0 {
+			// 	continue
+			// } else {
+			for task.row[j] == 0 && task.count[j] == 0 {
+				j++
+				if j >= size {
+					goto RowDone
 				}
 
-				if task.count[j] == 3 {
-					newboard[j] = 1
-				}
-				if task.count[j] < 2 {
-					newboard[j] = 0
-				}
-				if task.count[j] > 3 {
-					newboard[j] = 0
-				}
 			}
+			if task.count[j] == 2 {
+				newboard[j] = task.row[j]
+			}
+
+			if task.count[j] == 3 {
+				newboard[j] = 1
+			}
+			if task.count[j] < 2 {
+				newboard[j] = 0
+			}
+			if task.count[j] > 3 {
+				newboard[j] = 0
+			}
+			//}
 		}
+	RowDone:
 		//_______________ END ________________
 		next <- result{newboard, task.row_id}
+
 	}
 }
 

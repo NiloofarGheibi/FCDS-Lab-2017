@@ -241,7 +241,7 @@ func main() {
 	must(err)
 	size, steps, prev = Get(file)
 	newboard = allocate_board(size)
-	log.Println("size = ", size, "steps = ", steps)
+	//log.Println("size = ", size, "steps = ", steps)
 
 	for k := 0; k < steps; k++ {
 		var wg sync.WaitGroup

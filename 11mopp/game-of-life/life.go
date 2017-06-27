@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -10,33 +9,101 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 )
 
-var fin *string
+var size int
+var steps int
+var CPU_NUM int
+var CHUNK int
+var prev [][]int
+var next [][]int
+var newboard [][]int
 
 type message struct {
-	count  []int
 	row    []int
 	row_id int
 }
-
 type result struct {
 	row    []int
 	row_id int
 }
 
-func must(err error) {
-	if err != nil {
-		log.Print(err)
-	}
-}
 func allocate_board(size int) [][]int {
 	board := make([][]int, size)
 	for i := range board {
 		board[i] = make([]int, size)
 	}
 	return board
+}
+
+func worker(tasksCh <-chan message, wg *sync.WaitGroup, results chan<- result) {
+	defer wg.Done()
+	for {
+		task, ok := <-tasksCh
+		if !ok {
+			return
+		}
+		//newboard := make([]int, CHUNK)
+		count := make([]int, size)
+		for i := 0; i < size; i++ {
+			count[i] = adjacent_to(prev, size, task.row_id, i)
+		}
+		for j := 0; j < size; j++ {
+
+			// for task.row[j] == 0 && count[j] == 0 {
+			// 	j++
+			// 	if j >= size {
+			// 		goto RowDone
+			// 	}
+
+			// }
+			if count[j] == 2 {
+				newboard[task.row_id][j] = task.row[j]
+			}
+
+			if count[j] == 3 {
+				newboard[task.row_id][j] = 1
+			}
+			if count[j] < 2 {
+				newboard[task.row_id][j] = 0
+			}
+			if count[j] > 3 {
+				newboard[task.row_id][j] = 0
+			}
+			//}
+		}
+		//RowDone:
+		//_______________ END ________________
+		//fmt.Println("processing task")
+		results <- result{newboard[task.row_id], task.row_id}
+	}
+}
+
+func pool(wg *sync.WaitGroup, workers, tasks int, resultCh chan result) {
+	tasksCh := make(chan message)
+	//resultCh := make(chan result)
+
+	for i := 0; i < workers; i++ {
+		go worker(tasksCh, wg, resultCh)
+	}
+
+	for j := 0; j < tasks; j++ {
+		//log.Println("prev = ", prev[j])
+		tasksCh <- message{prev[j], j}
+	}
+
+	for a := 0; a < tasks; a++ {
+		//combine(a, <-resultCh)
+		<-resultCh
+	}
+	close(tasksCh)
+}
+
+func init() {
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	CPU_NUM = runtime.NumCPU()
 }
 
 /* return the number of on cells adjacent to the i,j cell */
@@ -74,7 +141,6 @@ func adjacent_to(board [][]int, size int, i int, j int) int {
 
 		for l = sl; l <= el; l++ {
 			count += board[k][l]
-			//fmt.Printf(" value of count %v \n", count)
 		}
 	}
 
@@ -82,37 +148,21 @@ func adjacent_to(board [][]int, size int, i int, j int) int {
 
 	return count
 }
-
-func play(board [][]int, size int, a [][]int) [][]int {
-	//var a int
-	newboard := allocate_board(size)
-	/* for each cell, apply the rules of Life */
-	for i := 0; i < size; i++ {
-		for j := 0; j < size; j++ {
-
-			if board[i][j] == 0 && a[i][j] == 0 {
-				continue
-			} else {
-
-				if a[i][j] == 2 {
-					newboard[i][j] = board[i][j]
-				}
-
-				if a[i][j] == 3 {
-					newboard[i][j] = 1
-				}
-				if a[i][j] < 2 {
-					newboard[i][j] = 0
-				}
-				if a[i][j] > 3 {
-					newboard[i][j] = 0
-				}
-			}
+func count(board [][]int) [][]int {
+	c := allocate_board(size)
+	// updating the count
+	for j := 0; j < size; j++ {
+		for i := 0; i < size; i++ {
+			c[j][i] = adjacent_to(board, size, j, i)
 		}
 	}
+	return c
+}
 
-	return newboard
-
+func combine(id int, rows result) {
+	fmt.Println("copy", id, rows.row_id)
+	time.Sleep(100)
+	copy(next[rows.row_id], rows.row)
 }
 
 /* print the life board */
@@ -180,113 +230,32 @@ func Get(file []byte) (int, int, [][]int) {
 	return size, steps, board
 }
 
-func init() {
-
-	fin = flag.String("in", "judge.in", "input file")
-	flag.Parse()
-
-}
-func Count(board [][]int, size int) [][]int {
-	c := allocate_board(size)
-	// updating the count
-	for j := 0; j < size; j++ {
-		for i := 0; i < size; i++ {
-			c[j][i] = adjacent_to(board, size, j, i)
-		}
-		//fmt.Println("count = ", c[j])
+func must(err error) {
+	if err != nil {
+		log.Print(err)
 	}
-	return c
-}
-
-func worker(tasksCh <-chan message, wg *sync.WaitGroup, size int, next chan result) {
-	defer wg.Done()
-	for {
-		newboard := make([]int, size)
-		task, ok := <-tasksCh
-		if !ok {
-			return
-		}
-		//fmt.Println("processing task", task.row_id, "= ", task.row)
-		//fmt.Println(task.row_id, " ", "count", task.count)
-		// ____________ Processing ____________
-		for j := 0; j < size; j++ {
-
-			// if task.row[j] == 0 && task.count[j] == 0 {
-			// 	continue
-			// } else {
-			for task.row[j] == 0 && task.count[j] == 0 {
-				j++
-				if j >= size {
-					goto RowDone
-				}
-
-			}
-			if task.count[j] == 2 {
-				newboard[j] = task.row[j]
-			}
-
-			if task.count[j] == 3 {
-				newboard[j] = 1
-			}
-			if task.count[j] < 2 {
-				newboard[j] = 0
-			}
-			if task.count[j] > 3 {
-				newboard[j] = 0
-			}
-			//}
-		}
-	RowDone:
-		//_______________ END ________________
-		next <- result{newboard, task.row_id}
-
-	}
-}
-
-func pool(wg *sync.WaitGroup, workers, tasks int, board [][]int, a [][]int, next chan result) {
-	tasksCh := make(chan message)
-
-	for i := 0; i < workers; i++ {
-		go worker(tasksCh, wg, tasks, next)
-	}
-
-	for i := 0; i < tasks; i++ {
-		tasksCh <- message{a[i], board[i], i}
-	}
-
-	close(tasksCh)
-
 }
 
 func main() {
 	file, err := ioutil.ReadAll(os.Stdin)
 	must(err)
-	size, steps, prev := Get(file)
-	Count(prev, size)
-	var tmp, n [][]int
-	for i := 0; i < steps; i++ {
-		var wg sync.WaitGroup
-		runtime.GOMAXPROCS(runtime.NumCPU())
-		workers := runtime.NumCPU()
-		next := make(chan result, size)
-		c := Count(prev, size)
-		wg.Add(workers)
-		go pool(&wg, workers, size, prev, c, next)
-		wg.Wait()
-		close(next)
-		// Data for each row is ready
-		//fmt.Println("After WAIT")
-		n = allocate_board(size)
-		for i := range next {
-			//fmt.Println("Row = ", i.row, "id = ", i.row_id)
-			n[i.row_id] = i.row
-		}
+	size, steps, prev = Get(file)
+	newboard = allocate_board(size)
+	log.Println("size = ", size, "steps = ", steps)
 
-		//print(n, size)
-		tmp = n
-		n = prev
+	for k := 0; k < steps; k++ {
+		var wg sync.WaitGroup
+		resultCh := make(chan result, size)
+		wg.Add(CPU_NUM)
+		go pool(&wg, CPU_NUM, size, resultCh)
+		wg.Wait()
+		//close(resultCh)
+		//fmt.Println("Step = ", k)
+		//print(newboard, size)
+		tmp := newboard
+		newboard = prev
 		prev = tmp
+		//_count = count(board)
 	}
 	print(prev, size)
-
 }

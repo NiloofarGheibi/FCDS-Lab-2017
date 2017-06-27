@@ -22,11 +22,11 @@ var next [][]int
 var newboard [][]int
 
 type message struct {
-	row    []int
+	row    [][]int
 	row_id int
 }
 type result struct {
-	row    []int
+	row    [][]int
 	row_id int
 }
 
@@ -38,65 +38,73 @@ func allocate_board(size int) [][]int {
 	return board
 }
 
-func worker(tasksCh <-chan message, wg *sync.WaitGroup, results chan<- result) {
+func worker(tasksCh <-chan message, wg *sync.WaitGroup) {
 	defer wg.Done()
 	for {
 		task, ok := <-tasksCh
 		if !ok {
 			return
 		}
-		//newboard := make([]int, CHUNK)
-		count := make([]int, size)
-		for i := 0; i < size; i++ {
-			count[i] = adjacent_to(prev, size, task.row_id, i)
+		count := make([][]int, len(task.row))
+		for i := range count {
+			count[i] = make([]int, size)
 		}
-		for j := 0; j < size; j++ {
-
-			// for task.row[j] == 0 && count[j] == 0 {
-			// 	j++
-			// 	if j >= size {
-			// 		goto RowDone
-			// 	}
-
-			// }
-			if count[j] == 2 {
-				newboard[task.row_id][j] = task.row[j]
+		for j := 0; j < len(task.row); j++ {
+			for i := 0; i < size; i++ {
+				count[j][i] = adjacent_to(prev, size, task.row_id+j, i)
+				newboard[task.row_id+j][i] = 0
 			}
-
-			if count[j] == 3 {
-				newboard[task.row_id][j] = 1
-			}
-			if count[j] < 2 {
-				newboard[task.row_id][j] = 0
-			}
-			if count[j] > 3 {
-				newboard[task.row_id][j] = 0
-			}
-			//}
 		}
-		//RowDone:
+		//print(newboard, size)
+		for i := 0; i < len(task.row); i++ {
+			for j := 0; j < size; j++ {
+				//log.Println(task.row[i])
+				for task.row[i][j] == 0 && count[i][j] == 0 {
+					//newboard[task.row_id][j] = 0
+					j++
+					if j >= size {
+						goto RowDone
+					}
+				}
+				if count[i][j] == 2 {
+					newboard[task.row_id+i][j] = task.row[i][j]
+				}
+
+				if count[i][j] == 3 {
+					newboard[task.row_id+i][j] = 1
+				}
+				if count[i][j] < 2 {
+					newboard[task.row_id+i][j] = 0
+				}
+				if count[i][j] > 3 {
+					newboard[task.row_id+i][j] = 0
+				}
+				//}
+			}
+		RowDone:
+		}
 		//_______________ END ________________
-		//fmt.Println("processing task")
-		results <- result{newboard[task.row_id], task.row_id}
 	}
 }
 
-func pool(wg *sync.WaitGroup, workers, tasks int, resultCh chan result) {
+func pool(wg *sync.WaitGroup, workers, tasks int) {
 	tasksCh := make(chan message)
 	//resultCh := make(chan result)
 
 	for i := 0; i < workers; i++ {
-		go worker(tasksCh, wg, resultCh)
+		go worker(tasksCh, wg)
 	}
 
 	for j := 0; j < tasks; j++ {
-		//log.Println("prev = ", prev[j])
-		tasksCh <- message{prev[j], j}
-	}
+		//tasksCh <- message{prev[j], j}
+		if j != tasks-1 {
+			//log.Println("prev = ", j, "s = ", j*CHUNK, "e = ", (j+1)*CHUNK)
+			tasksCh <- message{prev[j*CHUNK : (j+1)*CHUNK], j * CHUNK}
+		} else {
+			//log.Println("prev = ", j, "s = ", j*CHUNK, "e = ", size)
+			tasksCh <- message{prev[j*CHUNK : size], j * CHUNK}
+		}
 
-	for a := 0; a < tasks; a++ {
-		//combine(a, <-resultCh)
-		<-resultCh
 	}
 	close(tasksCh)
 }
@@ -162,7 +170,7 @@ func count(board [][]int) [][]int {
 func combine(id int, rows result) {
 	fmt.Println("copy", id, rows.row_id)
 	time.Sleep(100)
-	copy(next[rows.row_id], rows.row)
+	//copy(next[rows.row_id], rows.row)
 }
 
 /* print the life board */
@@ -241,13 +249,19 @@ func main() {
 	must(err)
 	size, steps, prev = Get(file)
 	newboard = allocate_board(size)
-	//log.Println("size = ", size, "steps = ", steps)
+	//fmt.Println("New board = ")
+	//print(newboard, size)
+	if size%CPU_NUM == 0 {
+		CHUNK = size / CPU_NUM
+	} else {
+		CHUNK = size/CPU_NUM + 1
+	}
 
+	log.Println("size = ", size, "steps = ", steps, "CPU = ", CPU_NUM, "CHUNK = ", CHUNK)
 	for k := 0; k < steps; k++ {
 		var wg sync.WaitGroup
-		resultCh := make(chan result, size)
 		wg.Add(CPU_NUM)
-		go pool(&wg, CPU_NUM, size, resultCh)
+		go pool(&wg, CPU_NUM, CPU_NUM)
 		wg.Wait()
 		//close(resultCh)
 		//fmt.Println("Step = ", k)

@@ -18,6 +18,7 @@ void BUILD_TIME_CHECKS() {
     BUILD_ERROR_IF(INT_TYPE_SIZE * CELL_VAL_SIZE < MAX_BDIM * MAX_BDIM);
 }
 
+
 typedef struct cellval {
     INT_TYPE v[CELL_VAL_SIZE];
 } cell_v;
@@ -142,6 +143,7 @@ static int parse_grid(sudoku *s) {
     int i, j, k=0;
     int ld_vals[s->dim][s->dim];
 
+#pragma parallel omp for collapse(2) nowait
     for (i = 0; i < s->dim; i++){
         for (j = 0; j < s->dim; k++,j++) {
             ld_vals[i][j] = s->grid[k];
@@ -149,13 +151,12 @@ static int parse_grid(sudoku *s) {
     }
     
 
-
+#pragma parallel omp for collapse(3) nowait
     for (i = 0; i < s->dim; i++)
         for (j = 0; j < s->dim; j++)
             for (k = 1; k <= s->dim; k++)
                 cell_v_set(&s->values[i][j], k);
-
-  
+ 
     for (i = 0; i < s->dim; i++)
         for (j = 0; j < s->dim; j++)
             if (ld_vals[i][j] > 0 && !assign(s, i, j, ld_vals[i][j]))
@@ -280,13 +281,24 @@ static int search (sudoku *s, int status) {
 
     if (!status) return status;
 
-    int solved = 1;
+int solved = 1;
+#pragma omp parallel sections
+{ 
+    #pragma omp section
+    {
     for (i = 0; solved && i < s->dim; i++) 
         for (j = 0; j < s->dim; j++) 
             if (cell_v_count(&s->values[i][j]) != 1) {
+            #pragma omp critical
+            {    
                 solved = 0;
+            }
                 break;
             }
+    }
+    
+}
+    
     if (solved) {
         s->sol_count++;
         return SUDOKU_SOLVE_STRATEGY == SUDOKU_SOLVE;
@@ -300,14 +312,15 @@ static int search (sudoku *s, int status) {
     
     cell_v **values_bkp = malloc (sizeof (cell_v *) * s->dim);
 
+
     for (i = 0; i < s->dim; i++)
         values_bkp[i] = malloc (sizeof (cell_v) * s->dim);
 
-int n_threads = omp_get_num_procs();
-int chunk = s->dim/n_threads*2; 
-
+#pragma omp parallel sections 
+{ 
+    #pragma omp section 
+    {
     for (i = 0; i < s->dim; i++){ 
-#pragma omp parallel for schedule(dynamic, 50)  
         for (j = 0; j < s->dim; j++) {
             int used = cell_v_count(&s->values[i][j]);
             if (used > 1 && used < min) {
@@ -317,27 +330,35 @@ int chunk = s->dim/n_threads*2;
             }
         }
     }
-            
+}
+}
+int n_threads = omp_get_num_procs();           
     for (k = 1; k <= s->dim; k++) {
         if (cell_v_get(&s->values[minI][minJ], k))  {
-//#pragma omp parallel for schedule(static , 100) 
+        #pragma omp parallel num_threads(n_threads)
+        {
+            #pragma omp for collapse(2) nowait
             for (i = 0; i < s->dim; i++)
                 for (j = 0; j < s->dim; j++)
                     values_bkp[i][j] = s->values[i][j];
-            
+        }    
             if (search (s, assign(s, minI, minJ, k))) {
                 ret = 1;
                 goto FR_RT;
             } else {
-int n_threads = omp_get_num_procs();
-int chunk = s->dim/n_threads;
+             #pragma omp parallel num_threads(n_threads)
+            {
+                #pragma omp for collapse(2) nowait
                 for (i = 0; i < s->dim; i++) 
-#pragma omp parallel for schedule(dynamic, 50) 
                     for (j = 0; j < s->dim; j++)
                         s->values[i][j] = values_bkp[i][j];
+                }
             }
         }
     }
+
+
+
     
     FR_RT:
     for (i = 0; i < s->dim; i++)
@@ -345,13 +366,15 @@ int chunk = s->dim/n_threads;
     free (values_bkp);
     
     return ret;
-}
 
+}
 int solve(sudoku *s) {
     return search(s, 1);
 }
 
 int main (int argc, char **argv) {
+    int n_threads = omp_get_num_procs();
+    omp_set_num_threads(n_threads); 
 
     int size;
     assert(scanf("%d", &size) == 1);

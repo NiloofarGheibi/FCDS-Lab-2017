@@ -92,7 +92,7 @@ void Histogram(PPMImage *image, float *h) {
     //printf("#threads%d\n",n_threads );
     //int chunk = n/n_threads;
     //printf("#Chunk%d\n",chunk );
-#pragma omp parallel for schedule(dynamic,100)//schedule(static, chunk) //num_threads(n_threads)
+#pragma omp parallel for schedule(dynamic)//schedule(dynamic,100)//schedule(static, chunk) //num_threads(n_threads)
     for (i = 0; i< (int)n; i++)
     {
         image->data[i].red = floor((image->data[i].red * 4) / 256);
@@ -107,10 +107,10 @@ void Histogram(PPMImage *image, float *h) {
     for (j = 0; j <= 3; j++) {
         for (k = 0; k <= 3; k++) {
             for (l = 0; l <= 3; l++) {
-#pragma omp parallel for schedule(dynamic,100)//schedule(static, chunk)
+#pragma omp parallel for reduction(+:count)//schedule(static, chunk)
                 for (i = 0; i < (int)n; i++) {
                     if (image->data[i].red == j && image->data[i].green == k && image->data[i].blue == l) {
-#pragma omp atomic
+//#pragma omp atomic
                         count++;
                     }
                 }

@@ -81,18 +81,14 @@ static PPMImage *readPPM() {
 void Histogram(PPMImage *image, float *h) {
     
     int i, j,  k, l, x, count;
-    int rows, cols;
-    
+    int rows, cols;    
     float n = image->y * image->x;
-    
+    int n_threads = omp_get_num_procs();//__builtin_omp_get_num_threads();
+
     cols = image->x;
     rows = image->y;
-    
-    //int n_threads = omp_get_num_procs();//__builtin_omp_get_num_threads();
-    //printf("#threads%d\n",n_threads );
-    //int chunk = n/n_threads;
-    //printf("#Chunk%d\n",chunk );
-#pragma omp parallel for schedule(dynamic)//schedule(dynamic,100)//schedule(static, chunk) //num_threads(n_threads)
+
+#pragma omp parallel for schedule(dynamic) //schedule(dynamic,100)//schedule(static, chunk) //num_threads(n_threads)
     for (i = 0; i< (int)n; i++)
     {
         image->data[i].red = floor((image->data[i].red * 4) / 256);
@@ -103,17 +99,26 @@ void Histogram(PPMImage *image, float *h) {
     
     count = 0;
     x = 0;
-    
+    int val;
     for (j = 0; j <= 3; j++) {
         for (k = 0; k <= 3; k++) {
             for (l = 0; l <= 3; l++) {
-#pragma omp parallel for reduction(+:count)//schedule(static, chunk)
-                for (i = 0; i < (int)n; i++) {
-                    if (image->data[i].red == j && image->data[i].green == k && image->data[i].blue == l) {
-//#pragma omp atomic
-                        count++;
-                    }
-                }
+// Example from : https://stackoverflow.com/questions/12754485/openmp-custom-reduction-variable
+                #pragma omp parallel private(val) num_threads(n_threads)//private(val)
+                    {
+                        val = 0;  // val can be declared as local variable (for each thread) 
+                        #pragma omp for nowait       // now pragma for  (here you don't need to create threads, that's why no "omp parallel" )
+                            // nowait specifies that the threads don't need to wait (for other threads to complete) after for loop, the threads can go ahead and execute the critical section 
+                        for (i = 0; i < (int)n ; i++) {
+                            if (image->data[i].red == j && image->data[i].green == k && image->data[i].blue == l) {
+                                val++;
+                            }
+                        }
+                        #pragma omp atomic
+                            //{
+                                count += val;
+                            //}
+                    } 
                 h[x] = count / n;
                 count = 0;
                 x++;
@@ -125,7 +130,9 @@ void Histogram(PPMImage *image, float *h) {
 
 
 int main(int argc, char *argv[]) {
-    
+
+     int n_threads = omp_get_num_procs();
+     omp_set_num_threads(n_threads); 
     int i;
     
     PPMImage *image = readPPM();

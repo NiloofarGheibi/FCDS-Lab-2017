@@ -4,18 +4,41 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
-	"flag"
+	//"flag"
 	"fmt"
 	"image"
 	"image/color"
 	"io"
 	"log"
+	//"math"
 	"os"
+	"runtime"
 	"strconv"
-	"strings"
+	"sync"
 )
 
 var fin *string
+var CPU_NUM int
+var d decoder
+var img image.Image
+var n float32
+var _image []PPMImage
+var size int
+var done bool
+
+type message struct {
+	j   uint32
+	k   uint32
+	l   uint32
+	x   int
+	his float32
+}
+
+type result struct {
+	his float32
+	x   int
+}
+
 var (
 	errBadHeader   = errors.New("ppm: invalid header")
 	errNotEnough   = errors.New("ppm: not enough image data")
@@ -74,9 +97,6 @@ func (d *decoder) decode(r io.Reader) (decoder, image.Image, error) {
 			if err != nil {
 				return *d, nil, errNotEnough
 			}
-			//fmt.Println(pixel[0])
-			//fmt.Println(pixel[1])
-			//fmt.Println(pixel[2])
 			img.SetRGBA(x, y, color.RGBA{pixel[0], pixel[1], pixel[2], 0xff})
 		}
 	}
@@ -128,19 +148,8 @@ func (d *decoder) decodeHeader() error {
 
 func init() {
 
-	fin = flag.String("in", "judge.in", "input file")
-	flag.Parse()
-
-}
-
-func Read() *os.File {
-
-	pwd, _ := os.Getwd()
-	//file, err := ioutil.ReadFile(pwd + "/" + *fin) // pass the file name
-	file, err := os.Open(pwd + "/" + *fin)
-	must(err)
-
-	return file
+	runtime.GOMAXPROCS(runtime.NumCPU())
+	CPU_NUM = runtime.NumCPU()
 
 }
 
@@ -154,13 +163,15 @@ func Test(d decoder, img image.Image) [64]float32 {
 	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
 		for x := bounds.Min.X; x < bounds.Max.X; x++ {
 			r, g, b, _ := img.At(x, y).RGBA()
-			r = r >> 8
-			g = g >> 8
-			b = b >> 8
-
+			//fmt.Println("red = ", r, "green = ", g, "blue = ", b)
+			r = r & 0x00FF
+			g = g & 0x00FF
+			b = b & 0x00FF
+			//fmt.Println("Before red = ", r, "green = ", g, "blue = ", b)
 			image[counter].red = (r >> 6) | 0
 			image[counter].green = (g >> 6) | 0
 			image[counter].blue = (b >> 6) | 0
+			//fmt.Println("After red = ", image[counter].red, "green = ", image[counter].green, "blue = ", image[counter].blue)
 			counter++
 		}
 	}
@@ -188,28 +199,88 @@ func Test(d decoder, img image.Image) [64]float32 {
 	return h
 }
 
-func Parse(file []byte) {
+func worker(tasksCh <-chan message, wg *sync.WaitGroup, resCh chan<- result) {
+	defer wg.Done()
+	for {
+		task, ok := <-tasksCh
+		if !ok {
+			return
+		}
+		if done == false {
+			Adjust()
+			done = true
+		}
+		count := float32(0)
 
-	str := string(file) // convert content to a 'string'
-	split := strings.SplitAfter(str, "\n")
-
-	// string to parse
-	format := split[0]
-	log.Println("format : ", format)
-	ints := strings.SplitAfter(split[1], " ")
-	log.Println("x y : ", ints[0], ints[1])
-	max := split[2]
-	log.Println(" maximum : ", max)
+		for i := 0; i < size; i++ {
+			if _image[i].red == task.j && _image[i].green == task.k && _image[i].blue == task.l {
+				count++
+			}
+		}
+		//_______________ END ________________
+		resCh <- result{count, task.x}
+	}
 }
 
+func pool(wg *sync.WaitGroup, workers, tasks int, h *[64]float32) {
+	tasksCh := make(chan message)
+	resCh := make(chan result, 64)
+	x := 0
+	//Adjust()
+	for i := 0; i < workers; i++ {
+		go worker(tasksCh, wg, resCh)
+	}
+
+	for j := uint32(0); j <= 3; j++ {
+		for k := uint32(0); k <= 3; k++ {
+			for l := uint32(0); l <= 3; l++ {
+				tasksCh <- message{j, k, l, x, 0.0}
+				x++
+			}
+		}
+	}
+
+	for i := 0; i < tasks; i++ {
+		val := <-resCh
+		h[val.x] = val.his / n
+	}
+	close(tasksCh)
+}
+
+func Adjust() {
+	bounds := img.Bounds()
+	_image = make([]PPMImage, size)
+	counter := 0
+	//log.Println(bounds.Min.Y, bounds.Max.Y, bounds.Min.X, bounds.Max.X)
+	for y := bounds.Min.Y; y < bounds.Max.Y; y++ {
+		for x := bounds.Min.X; x < bounds.Max.X; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			//fmt.Println("red = ", r, "green = ", g, "blue = ", b)
+			r = r & 0x00FF
+			g = g & 0x00FF
+			b = b & 0x00FF
+			_image[counter].red = (r >> 6) | 0
+			_image[counter].green = (g >> 6) | 0
+			_image[counter].blue = (b >> 6) | 0
+			//fmt.Println("After red = ", image[counter].red, "green = ", image[counter].green, "blue = ", image[counter].blue)
+			counter++
+		}
+	}
+}
 func main() {
 
-	//Parse(Read())
-
-	d, img, _ := Decode(Read())
-	//fmt.Println(d)
+	d, img, _ = Decode(os.Stdin)
+	n = float32(d.width * d.height)
+	var hist [64]float32
+	size = d.width * d.height
+	done = false
 	//hist := Histogram(d, img)
-	hist := Test(d, img)
+	var wg sync.WaitGroup
+	wg.Add(CPU_NUM)
+	go pool(&wg, CPU_NUM, 64, &hist)
+	wg.Wait()
+
+	//hist := Test(d, img)
 	for i := 0; i < 64; i++ {
 		fmt.Printf("%0.3f ", hist[i])
 	}

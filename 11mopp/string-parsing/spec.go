@@ -11,6 +11,7 @@ import (
 )
 
 var fin *string
+var _result []string
 
 //Grammar is present the CFG grammars
 //ex:  S-> AB
@@ -248,6 +249,34 @@ func (c *CYK) evalCYKResult() bool {
 	return false
 }
 
+// Print out the Path
+func (c *CYK) PrintPath() {
+	if len(c.CYKResult) == 0 {
+		fmt.Println("We still not calculate CYK or no result...")
+		return
+	}
+	//log.Println(len(c.InputString))
+	lineIndex := len(c.InputString)
+	//log.Println(c.InputString)
+	_char := strings.Split(c.InputString, "")
+	///fmt.Println(_char[0])
+	for loop := lineIndex - 1; loop > 0; loop-- {
+
+		//fmt.Printf("%d:", lineIndex)
+		for i := 0; i < len(c.InputString)-loop; i++ {
+			j := i + loop
+			c.PrintPathElement(i, j, _char[i])
+		}
+		//fmt.Printf("\n")
+		lineIndex = lineIndex + 1
+	}
+	//fmt.Printf("1:")
+	for i := 0; i < len(c.InputString); i++ {
+		c.PrintPathElement(i, i, _char[i])
+	}
+	//fmt.Printf("\n")
+}
+
 // Print out the triangle result on CYK
 func (c *CYK) PrintResult() {
 	if len(c.CYKResult) == 0 {
@@ -289,6 +318,33 @@ func (c *CYK) printResultMatrixElement(i, j int) {
 		}
 	}
 	fmt.Printf("}")
+}
+
+func (c *CYK) PrintPathElement(i, j int, ch string) {
+
+	results, err := c.getResultMatrix(i, j)
+	if err != nil {
+		fmt.Println("Empty result")
+		return
+	}
+	//log.Println(results)
+	for index, _ := range results {
+		//fmt.Printf("%s", string(results[index]))
+		s := string(results[index])
+		//fmt.Println("s = ", s)
+		for _, r := range c.Grammars {
+			if s == r.LeftSymbol {
+				if len(r.RightSymbol) != 1 {
+					fmt.Println(s, ":", r.RightSymbol)
+				} else {
+					//fmt.Println("right  = ", r.RightSymbol)
+					if r.RightSymbol == ch {
+						fmt.Println(s, ":", r.RightSymbol)
+					}
+				}
+			}
+		}
+	}
 }
 
 // READER
@@ -600,22 +656,25 @@ func main() {
 	rules = CNF(rules, set_terminals, set_nonterminals, set_Mapping_Terminals, grammar)
 	cyk := NewCYK(grammar.Start())
 	_ = input
-	for _, r := range rules {
-		fmt.Println(r)
-	}
+	// for _, r := range rules {
+	// 	fmt.Println(r)
+	// }
 	for _, rule := range rules {
 		cyk.InputGrammar(SpaceMap(rule.LeftSymbol), SpaceMap(rule.RightSymbol))
 	}
 	cyk.SetTerminals(grammar.Terminals())
 	cyk.SetNonTerminals(grammar.NonTerminals())
 	//log.Println(input)
-	result := cyk.Eval("5+5")
+	result := cyk.Eval(input)
 	if result {
 		// Call the Derivation Tree
+		cyk.PrintPath()
 		fmt.Println("SUCCESS")
 	} else {
 		fmt.Println("FAILED")
 	}
 	//log.Println("Result:", result)
-	cyk.PrintResult()
+	//cyk.PrintResult()
+	//fmt.Println("__________________")
+
 }
